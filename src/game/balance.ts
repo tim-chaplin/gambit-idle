@@ -2,7 +2,19 @@ import { createBattle, runBattle } from './combat';
 import { ZONES } from './data/areas';
 import { ITEMS } from './data/items';
 import { seeded } from './rng';
-import { applyVictory, buyItem, equipItem, isZoneUnlocked, newGame, type GameState } from './state';
+import {
+  applyVictory,
+  buyItem,
+  equipItem,
+  heroStats,
+  heroVitals,
+  innTick,
+  isPartyRested,
+  isZoneUnlocked,
+  newGame,
+  saveBattleVitals,
+  type GameState,
+} from './state';
 
 /** Seconds per turn and pause between fights, matching the live game loop. */
 export const TURN_SECONDS = 2;
@@ -14,6 +26,8 @@ export interface SimResult {
   minutes: number;
   level: number;
   bossBeaten: boolean;
+  /** Share of total time spent resting at the inn. */
+  restShare: number;
   log: string[];
 }
 
@@ -29,7 +43,20 @@ function shopSensibly(state: GameState) {
   while ((state.inventory.potion ?? 0) < 3 && buyItem(state, 'potion'));
 }
 
-/** Plays the first area like a reasonable player: push forward, retreat after repeated wipes, shop often. */
+/** Inn ticks until the party is fully rested. */
+function restFully(state: GameState): number {
+  let ticks = 0;
+  while (!isPartyRested(state)) {
+    innTick(state);
+    ticks++;
+  }
+  return ticks;
+}
+
+/**
+ * Plays the first area like a reasonable player: push forward, rest at the inn when HP runs low,
+ * drop back a zone after repeated wipes, and shop often.
+ */
 export function simulateFirstArea(seed: number, maxFights = 2000): SimResult {
   const rng = seeded(seed);
   const state = newGame();
@@ -37,6 +64,7 @@ export function simulateFirstArea(seed: number, maxFights = 2000): SimResult {
   let fights = 0;
   let wipes = 0;
   let turns = 0;
+  let restTicks = 0;
   let lossStreak = 0;
   let retreatFor = 0;
 
@@ -59,7 +87,12 @@ export function simulateFirstArea(seed: number, maxFights = 2000): SimResult {
     const zone = retreatFor > 0 && unlocked.length > 1 ? unlocked[unlocked.length - 2] : frontier;
     if (retreatFor > 0) retreatFor--;
 
+    // Head to the inn before a fight when HP is low, or always before the boss.
+    const hpPct = heroVitals(hero).hp / heroStats(hero).maxHp;
+    if (hpPct < 0.5 || zone.boss) restTicks += restFully(state);
+
     const battle = runBattle(createBattle(state, zone.id, rng), state, rng);
+    saveBattleVitals(state, battle);
     fights++;
     turns += battle.turn;
     if (battle.outcome === 'victory') {
@@ -70,6 +103,7 @@ export function simulateFirstArea(seed: number, maxFights = 2000): SimResult {
       if (zone.boss && result.zoneCleared) break;
     } else {
       wipes++;
+      restTicks += restFully(state);
       if (++lossStreak >= 2) {
         retreatFor = 10;
         lossStreak = 0;
@@ -78,10 +112,13 @@ export function simulateFirstArea(seed: number, maxFights = 2000): SimResult {
     shopSensibly(state);
   }
 
+  const fightSeconds = turns * TURN_SECONDS + fights * BETWEEN_FIGHTS_SECONDS;
+  const restSeconds = restTicks * TURN_SECONDS;
   return {
     fights,
     wipes,
-    minutes: (turns * TURN_SECONDS + fights * BETWEEN_FIGHTS_SECONDS) / 60,
+    minutes: (fightSeconds + restSeconds) / 60,
+    restShare: restSeconds / (fightSeconds + restSeconds),
     level: state.heroes[0].level,
     bossBeaten: ZONES.filter((z) => z.boss).every((z) => (state.zoneKills[z.id] ?? 0) > 0),
     log,

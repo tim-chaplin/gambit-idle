@@ -3,7 +3,7 @@ import { ZONES, zoneById } from './data/areas';
 import { CLASSES } from './data/classes';
 import { ENEMIES } from './data/enemies';
 import { ITEMS } from './data/items';
-import type { Battle, EquipSlot, Hero, StatBlock } from './types';
+import type { Activity, Battle, EquipSlot, Hero, StatBlock } from './types';
 
 export const SAVE_VERSION = 1;
 
@@ -16,8 +16,13 @@ export interface GameState {
   inventory: Record<string, number>;
   /** Victories per zone. */
   zoneKills: Record<string, number>;
+  /** Selected zone; the party fights here when `activity` is 'fighting'. */
   currentZone: string;
+  activity: Activity;
 }
+
+/** Fraction of max HP/MP recovered per inn tick (one tick per turn length). */
+export const INN_RECOVERY_PER_TICK = 0.1;
 
 export function newHero(id: string, classId: string, name: string): Hero {
   const cls = CLASSES[classId];
@@ -40,6 +45,7 @@ export function newGame(): GameState {
     inventory: { potion: 3 },
     zoneKills: {},
     currentZone: ZONES[0].id,
+    activity: 'idle',
   };
 }
 
@@ -58,6 +64,41 @@ export function heroStats(hero: Hero): StatBlock {
     stats.def += item?.def ?? 0;
   }
   return stats;
+}
+
+/** Current HP/MP, clamped to the hero's maximums. */
+export function heroVitals(hero: Hero): { hp: number; mp: number } {
+  const { maxHp, maxMp } = heroStats(hero);
+  return { hp: Math.min(maxHp, hero.hp ?? maxHp), mp: Math.min(maxMp, hero.mp ?? maxMp) };
+}
+
+/** Copies HP/MP from a battle back onto the heroes so damage carries over. */
+export function saveBattleVitals(state: GameState, battle: Battle) {
+  for (const c of battle.combatants) {
+    const hero = c.heroId ? state.heroes.find((h) => h.id === c.heroId) : undefined;
+    if (hero) {
+      hero.hp = c.hp;
+      hero.mp = c.mp;
+    }
+  }
+}
+
+export const isPartyWiped = (state: GameState) => state.heroes.every((h) => heroVitals(h).hp <= 0);
+export const isPartyRested = (state: GameState) =>
+  state.heroes.every((h) => {
+    const { maxHp, maxMp } = heroStats(h);
+    const v = heroVitals(h);
+    return v.hp >= maxHp && v.mp >= maxMp;
+  });
+
+/** One inn tick: every hero recovers a slice of max HP and MP. */
+export function innTick(state: GameState) {
+  for (const hero of state.heroes) {
+    const { maxHp, maxMp } = heroStats(hero);
+    const v = heroVitals(hero);
+    hero.hp = Math.min(maxHp, v.hp + Math.ceil(maxHp * INN_RECOVERY_PER_TICK));
+    hero.mp = Math.min(maxMp, v.mp + Math.ceil(maxMp * INN_RECOVERY_PER_TICK));
+  }
 }
 
 export const xpToNext = (level: number) => Math.round(12 * level ** 1.8);
@@ -107,12 +148,19 @@ export function applyVictory(state: GameState, battle: Battle): VictoryResult {
   const levelUps: VictoryResult['levelUps'] = [];
   for (const hero of state.heroes) {
     const before = learnedSkills(hero);
+    const oldStats = heroStats(hero);
+    const oldVitals = heroVitals(hero);
     hero.xp += xp;
     let leveled = false;
     while (hero.xp >= xpToNext(hero.level)) {
       hero.xp -= xpToNext(hero.level);
       hero.level += 1;
       leveled = true;
+    }
+    if (leveled && oldVitals.hp > 0) {
+      const newStats = heroStats(hero);
+      hero.hp = oldVitals.hp + newStats.maxHp - oldStats.maxHp;
+      hero.mp = oldVitals.mp + newStats.maxMp - oldStats.maxMp;
     }
     if (leveled) {
       const learned = learnedSkills(hero).filter((s) => !before.includes(s));
@@ -156,7 +204,9 @@ export function deserialize(json: string | null): GameState {
   try {
     const data = JSON.parse(json) as GameState;
     if (data.version !== SAVE_VERSION || !Array.isArray(data.heroes) || data.heroes.length === 0) return newGame();
-    return { ...newGame(), ...data };
+    const state = { ...newGame(), ...data };
+    if (!['idle', 'fighting', 'resting'].includes(state.activity)) state.activity = 'idle';
+    return state;
   } catch {
     return newGame();
   }

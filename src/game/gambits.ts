@@ -81,7 +81,7 @@ export function canUse(action: ActionDef, actor: Combatant, hero: Hero, ctx: Gam
 
 /**
  * Walks the hero's gambits top to bottom and returns the first one whose condition finds a target
- * and whose action is usable. Falls back to attacking the first foe if none apply.
+ * and whose action is usable. Returns null (the hero waits) if none apply.
  */
 export function chooseAction(
   battle: Battle,
@@ -98,6 +98,5 @@ export function chooseAction(
     const target = condition.pick(battle, actor);
     if (target) return { action, target, gambitIndex: i };
   }
-  const fallbackTarget = foesOf(battle, actor)[0];
-  return fallbackTarget ? { action: ACTIONS.attack, target: fallbackTarget, gambitIndex: -1 } : null;
+  return null;
 }

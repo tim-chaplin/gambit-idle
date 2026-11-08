@@ -9,15 +9,40 @@ import {
   deserialize,
   equipItem,
   heroStats,
+  heroVitals,
+  innTick,
+  isPartyRested,
   isZoneUnlocked,
   newGame,
+  saveBattleVitals,
   serialize,
   xpToNext,
+  type GameState,
 } from './state';
+import type { Gambit } from './types';
+
+const BASIC: Gambit[] = [
+  { enabled: true, condition: 'self-hp-30', action: 'potion' },
+  { enabled: true, condition: 'foe-any', action: 'attack' },
+];
+
+function programmedGame(): GameState {
+  const state = newGame();
+  state.heroes[0].gambits = BASIC.map((g) => ({ ...g }));
+  return state;
+}
 
 describe('gambits', () => {
-  it('uses the first rule whose condition and action apply', () => {
+  it('new heroes start with no gambits and wait in combat', () => {
     const state = newGame();
+    expect(state.heroes[0].gambits).toEqual([]);
+    const battle = createBattle(state, 'sf-1', seeded(1));
+    const events = stepAction(battle, state, seeded(1));
+    expect(events).toContainEqual({ type: 'idle', actorId: 'hero-1' });
+  });
+
+  it('uses the first rule whose condition and action apply', () => {
+    const state = programmedGame();
     const battle = createBattle(state, 'sf-1', seeded(1));
     const fighter = battle.combatants[0];
     const hero = state.heroes[0];
@@ -59,8 +84,7 @@ describe('gambits', () => {
     const battle = createBattle(state, 'sf-1', seeded(1));
     const fighter = battle.combatants[0];
     fighter.hp = 1;
-    // Neither rule is valid, so the fallback attack is used.
-    expect(chooseAction(battle, fighter, hero, state)?.gambitIndex).toBe(-1);
+    expect(chooseAction(battle, fighter, hero, state)).toBeNull();
   });
 });
 
@@ -76,10 +100,69 @@ describe('combat', () => {
     expect(kingTurn).toEqual([{ type: 'stunned', actorId: 'enemy-0' }]);
   });
 
-  it('a fresh fighter beats the first zone', () => {
+  it('MP regenerates as its own step between rounds', () => {
     const state = newGame();
+    state.heroes[0].level = 2;
+    state.heroes[0].gambits = [{ enabled: true, condition: 'foe-any', action: 'shield-bash' }];
+    const battle = createBattle(state, 'sf-5', seeded(3));
+    const fighter = battle.combatants[0];
+    stepAction(battle, state, seeded(3)); // round 1: fighter bashes (-4 MP)
+    stepAction(battle, state, seeded(3)); // round 1: king is stunned
+    const mpBefore = fighter.mp;
+    const regen = stepAction(battle, state, seeded(3));
+    expect(regen).toEqual([{ type: 'regen', gains: [{ id: fighter.id, mp: 1 }] }]);
+    expect(fighter.mp).toBe(mpBefore + 1);
+    const next = stepAction(battle, state, seeded(3));
+    expect(next[0]).toEqual({ type: 'turn', turn: 2 });
+  });
+
+  it('skips the regen step when MP is already full', () => {
+    const state = programmedGame();
+    const battle = createBattle(state, 'sf-1', seeded(5));
+    for (let i = 0; i < 20 && battle.turn < 3 && !battle.outcome; i++) {
+      const events = stepAction(battle, state, seeded(5));
+      expect(events.some((e) => e.type === 'regen')).toBe(false);
+    }
+  });
+
+  it('a programmed fighter beats the first zone', () => {
+    const state = programmedGame();
     const battle = runBattle(createBattle(state, 'sf-1', seeded(7)), state, seeded(7));
     expect(battle.outcome).toBe('victory');
+  });
+});
+
+describe('sustain', () => {
+  it('HP and MP carry over between fights', () => {
+    const state = programmedGame();
+    const battle = runBattle(createBattle(state, 'sf-1', seeded(2)), state, seeded(2));
+    saveBattleVitals(state, battle);
+    const { hp } = heroVitals(state.heroes[0]);
+    expect(hp).toBeLessThan(heroStats(state.heroes[0]).maxHp);
+    const next = createBattle(state, 'sf-1', seeded(3));
+    expect(next.combatants[0].hp).toBe(hp);
+  });
+
+  it('the inn recovers HP and MP over time', () => {
+    const state = newGame();
+    state.heroes[0].hp = 0;
+    state.heroes[0].mp = 0;
+    expect(isPartyRested(state)).toBe(false);
+    innTick(state);
+    expect(heroVitals(state.heroes[0]).hp).toBe(4); // 10% of 40
+    for (let i = 0; i < 12; i++) innTick(state);
+    expect(isPartyRested(state)).toBe(true);
+  });
+
+  it('level-ups raise current HP by the max HP gained, not a full heal', () => {
+    const state = programmedGame();
+    const hero = state.heroes[0];
+    hero.xp = xpToNext(1) - 1;
+    const battle = runBattle(createBattle(state, 'sf-1', seeded(1)), state, seeded(1));
+    hero.hp = 10;
+    applyVictory(state, battle);
+    expect(hero.level).toBe(2);
+    expect(heroVitals(hero).hp).toBe(18);
   });
 });
 
@@ -97,7 +180,7 @@ describe('battle setup', () => {
 
 describe('progression', () => {
   it('victories grant rewards, levels and unlock the next zone', () => {
-    const state = newGame();
+    const state = programmedGame();
     expect(isZoneUnlocked(state, 'sf-2')).toBe(false);
     for (let i = 0; i < zoneById('sf-1').killsToClear; i++) {
       const battle = runBattle(createBattle(state, 'sf-1', seeded(i)), state, seeded(i));
@@ -129,7 +212,10 @@ describe('progression', () => {
   it('saves round-trip and bad saves start fresh', () => {
     const state = newGame();
     state.gold = 42;
-    expect(deserialize(serialize(state)).gold).toBe(42);
+    state.activity = 'resting';
+    const loaded = deserialize(serialize(state));
+    expect(loaded.gold).toBe(42);
+    expect(loaded.activity).toBe('resting');
     expect(deserialize('not json').gold).toBe(0);
     expect(deserialize(null).heroes).toHaveLength(1);
   });

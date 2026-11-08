@@ -18,7 +18,13 @@ export interface Hero {
   xp: number;
   equipment: Partial<Record<EquipSlot, string>>;
   gambits: Gambit[];
+  /** Current HP/MP, carried between fights. Missing means full (older saves). */
+  hp?: number;
+  mp?: number;
 }
+
+/** What the party is doing right now. */
+export type Activity = 'idle' | 'fighting' | 'resting';
 
 /** A participant in a battle (transient). */
 export interface Combatant {
@@ -50,7 +56,8 @@ export type BattleEvent =
     }
   | { type: 'stunned'; actorId: string }
   | { type: 'idle'; actorId: string }
-  | { type: 'defeated'; targetId: string };
+  | { type: 'defeated'; targetId: string }
+  | { type: 'regen'; gains: { id: string; mp: number }[] };
 
 export interface Battle {
   zoneId: string;
@@ -58,5 +65,7 @@ export interface Battle {
   turn: number;
   /** Ids of combatants still to act this turn. */
   queue: string[];
+  /** True once the between-rounds regen step has run for the round that just ended. */
+  regenDone: boolean;
   outcome: 'victory' | 'defeat' | null;
 }

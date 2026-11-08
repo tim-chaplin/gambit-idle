@@ -4,24 +4,25 @@ import { CLASSES } from './data/classes';
 import { ENEMIES } from './data/enemies';
 import { chooseAction } from './gambits';
 import { pick, randInt, type Rng } from './rng';
-import { heroStats, type GameState } from './state';
+import { heroStats, heroVitals, type GameState } from './state';
 import type { Battle, BattleEvent, Combatant } from './types';
 
-/** MP each party member regains at the start of every turn after the first. */
+/** MP each party member regains between rounds, as its own combat step. */
 export const MP_REGEN_PER_TURN = 1;
 
 export function createBattle(state: GameState, zoneId: string, rng: Rng): Battle {
   const zone = zoneById(zoneId);
   const party: Combatant[] = state.heroes.map((hero) => {
     const stats = heroStats(hero);
+    const { hp, mp } = heroVitals(hero);
     return {
       id: hero.id,
       name: hero.name,
       side: 'party',
       sprite: CLASSES[hero.classId].sprite,
       stats,
-      hp: stats.maxHp,
-      mp: stats.maxMp,
+      hp,
+      mp,
       stunned: 0,
       heroId: hero.id,
     };
@@ -52,7 +53,7 @@ export function createBattle(state: GameState, zoneId: string, rng: Rng): Battle
     if (same > 1) e.name = `${baseNames[i]} ${String.fromCharCode(65 + nth)}`;
   });
 
-  return { zoneId, combatants: [...party, ...enemies], turn: 0, queue: [], outcome: null };
+  return { zoneId, combatants: [...party, ...enemies], turn: 0, queue: [], regenDone: false, outcome: null };
 }
 
 export function computeDamage(atk: number, def: number, power: number, rng: Rng): number {
@@ -64,11 +65,21 @@ const byId = (battle: Battle, id: string) => battle.combatants.find((c) => c.id 
 const living = (battle: Battle, side: Combatant['side']) =>
   battle.combatants.filter((c) => c.side === side && c.hp > 0);
 
+function regenStep(battle: Battle): { id: string; mp: number }[] {
+  const gains: { id: string; mp: number }[] = [];
+  for (const c of living(battle, 'party')) {
+    const mp = Math.min(c.stats.maxMp - c.mp, MP_REGEN_PER_TURN);
+    if (mp > 0) {
+      c.mp += mp;
+      gains.push({ id: c.id, mp });
+    }
+  }
+  return gains;
+}
+
 function startTurn(battle: Battle): BattleEvent {
   battle.turn += 1;
-  if (battle.turn > 1) {
-    for (const c of living(battle, 'party')) c.mp = Math.min(c.stats.maxMp, c.mp + MP_REGEN_PER_TURN);
-  }
+  battle.regenDone = false;
   battle.queue = [...living(battle, 'party'), ...living(battle, 'enemy')].map((c) => c.id);
   return { type: 'turn', turn: battle.turn };
 }
@@ -80,7 +91,15 @@ function startTurn(battle: Battle): BattleEvent {
 export function stepAction(battle: Battle, state: GameState, rng: Rng): BattleEvent[] {
   if (battle.outcome) return [];
   const events: BattleEvent[] = [];
-  if (battle.queue.length === 0) events.push(startTurn(battle));
+  if (battle.queue.length === 0) {
+    // Between rounds: regen is a separate step so it never blends into a hero's action.
+    if (battle.turn > 0 && !battle.regenDone) {
+      battle.regenDone = true;
+      const gains = regenStep(battle);
+      if (gains.length) return [{ type: 'regen', gains }];
+    }
+    events.push(startTurn(battle));
+  }
 
   let actor: Combatant | undefined;
   while (battle.queue.length > 0 && !actor) {

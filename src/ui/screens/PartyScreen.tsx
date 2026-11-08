@@ -3,7 +3,7 @@ import { ACTIONS } from '../../game/data/actions';
 import { CLASSES } from '../../game/data/classes';
 import { ITEMS } from '../../game/data/items';
 import { CONDITIONS, CONDITION_IDS } from '../../game/gambits';
-import { gambitActions, heroStats, learnedSkills, xpToNext } from '../../game/state';
+import { gambitActions, heroStats, heroVitals, learnedSkills, xpToNext } from '../../game/state';
 import type { EquipSlot, Gambit, Hero } from '../../game/types';
 import { Bar, Panel, Sprite } from '../components';
 import { useEngine } from '../useEngine';
@@ -28,7 +28,7 @@ function GambitEditor({ hero }: { hero: Hero }) {
 
   return (
     <div class="gambits">
-      <p class="hint">Each turn, the first rule that applies is used. If none apply, the hero attacks.</p>
+      <p class="hint">Each turn, the hero uses the first rule that applies. If none apply, the hero does nothing!</p>
       {hero.gambits.map((g, i) => {
         const condition = CONDITIONS[g.condition];
         const action = ACTIONS[g.action];
@@ -97,6 +97,7 @@ function HeroCard({ hero }: { hero: Hero }) {
   const stats = heroStats(hero);
   const learned = learnedSkills(hero);
   const need = xpToNext(hero.level);
+  const vitals = heroVitals(hero);
 
   return (
     <>
@@ -112,8 +113,8 @@ function HeroCard({ hero }: { hero: Hero }) {
           </div>
         </div>
         <div class="stats">
-          <div><span>HP</span>{stats.maxHp}</div>
-          <div><span>MP</span>{stats.maxMp}</div>
+          <div><span>HP</span>{vitals.hp}/{stats.maxHp}</div>
+          <div><span>MP</span>{vitals.mp}/{stats.maxMp}</div>
           <div><span>ATK</span>{stats.atk}</div>
           <div><span>DEF</span>{stats.def}</div>
         </div>

@@ -23,10 +23,7 @@ export const CLASSES: Record<string, ClassDef> = {
       { skillId: 'attack', level: 1 },
       { skillId: 'shield-bash', level: 2 },
     ],
-    defaultGambits: [
-      { enabled: true, condition: 'self-hp-30', action: 'potion' },
-      { enabled: true, condition: 'foe-any', action: 'attack' },
-    ],
+    defaultGambits: [],
     gambitSlots: 4,
   },
 };

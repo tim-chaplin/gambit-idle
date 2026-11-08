@@ -7,6 +7,8 @@ import { useEngine } from './useEngine';
 
 declare const __BUILD_ID__: string;
 
+const ACTIVITY_LABELS = { idle: 'Idle', fighting: 'Fighting', resting: 'At the Inn' };
+
 type Screen = { kind: 'party' } | { kind: 'town' } | { kind: 'area'; areaId: string };
 
 export function App() {
@@ -30,6 +32,7 @@ export function App() {
           <span class="coin" />
           {engine.state.gold}
         </div>
+        <div class={`activity activity-${engine.state.activity}`}>{ACTIVITY_LABELS[engine.state.activity]}</div>
         {navItems.map((item) => (
           <button class={`nav-btn ${item.active ? 'active' : ''}`} onClick={() => setScreen(item.screen)}>
             {item.label}
@@ -40,7 +43,7 @@ export function App() {
       <main class="main">
         {screen.kind === 'party' && <PartyScreen />}
         {screen.kind === 'town' && <TownScreen />}
-        {screen.kind === 'area' && <AreaScreen areaId={screen.areaId} />}
+        {screen.kind === 'area' && <AreaScreen areaId={screen.areaId} onOpenParty={() => setScreen({ kind: 'party' })} />}
       </main>
       <div class="toasts">
         {engine.toasts.map((t) => (

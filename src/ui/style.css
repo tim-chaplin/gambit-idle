@@ -177,6 +177,7 @@ button, select { font: inherit; color: inherit; }
 }
 .float-dmg { color: #fff; }
 .float-heal { color: var(--good); }
+.float-mp { color: #8fd0ff; font-size: 24px; left: 105%; top: 40%; }
 .float-info { color: var(--gold); font-size: 17px; }
 .banner {
   position: absolute;
@@ -319,3 +320,31 @@ select {
   animation: toast-in 0.25s ease-out;
 }
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
+
+/* Activity indicator in the menu */
+.activity { font-size: 15px; text-align: center; padding: 2px 0; border: 2px solid var(--border); }
+.activity-fighting { color: var(--bad); }
+.activity-resting { color: var(--good); }
+.activity-idle { color: var(--muted); }
+
+/* Pre-battle */
+.stage-center { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0; }
+.btn-fight { font-size: 30px; padding: 10px 36px; background: #b4372f; border-color: #ff8a7a; }
+.btn-small { font-size: 16px; padding: 4px 10px; }
+.notice {
+  background: #000b;
+  border: 2px solid var(--gold);
+  padding: 8px;
+  font-size: 17px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.retreat { position: absolute; top: 32px; right: 6px; background: #3a3a5a; border-color: var(--border); z-index: 1; }
+
+/* Inn */
+.inn-party { display: flex; flex-direction: column; gap: 8px; }
+.inn-hero { display: flex; gap: 8px; align-items: center; }
+.inn-bars { flex: 1; font-size: 17px; }

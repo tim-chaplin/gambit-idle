@@ -8,8 +8,12 @@ import {
   buyItem,
   deserialize,
   equipItem,
+  innTick,
+  isPartyRested,
+  isPartyWiped,
   isZoneUnlocked,
   newGame,
+  saveBattleVitals,
   serialize,
   type GameState,
 } from './state';
@@ -18,6 +22,8 @@ import type { Battle, BattleEvent, EquipSlot, Gambit } from './types';
 export const TURN_MS = 2000;
 export const AFTER_VICTORY_MS = 2000;
 export const AFTER_DEFEAT_MS = 3000;
+/** Pause for the between-rounds regen step. */
+export const REGEN_STEP_MS = 600;
 const SAVE_KEY = 'gambit-idle-save';
 const LOG_LIMIT = 40;
 
@@ -32,10 +38,11 @@ export interface Toast {
   text: string;
 }
 
-/** Live game runtime: owns the state, paces the battle loop, and notifies the UI. */
+/** Live game runtime: owns the state, paces the battle and inn loops, and notifies the UI. */
 export class GameEngine {
   state: GameState;
-  battle: Battle;
+  /** The current fight; null unless the party is fighting. */
+  battle: Battle | null = null;
   /** Banner shown between fights, e.g. "Victory! +12 XP". */
   banner: { text: string; tone: 'good' | 'bad' } | null = null;
   log: LogLine[] = [];
@@ -53,7 +60,11 @@ export class GameEngine {
   ) {
     this.state = deserialize(this.storage?.getItem(SAVE_KEY) ?? null);
     if (!isZoneUnlocked(this.state, this.state.currentZone)) this.state.currentZone = ZONES[0].id;
-    this.battle = createBattle(this.state, this.state.currentZone, this.rng);
+    // Resume whatever the party was doing when the game was closed.
+    if (this.state.activity === 'fighting') {
+      if (isPartyWiped(this.state)) this.state.activity = 'resting';
+      else this.battle = createBattle(this.state, this.state.currentZone, this.rng);
+    }
   }
 
   subscribe(fn: () => void) {
@@ -77,11 +88,55 @@ export class GameEngine {
 
   // --- Player actions -------------------------------------------------------
 
-  setZone(zoneId: string) {
+  /** Picks a zone. If the party is already fighting, it moves there straight away. */
+  selectZone(zoneId: string) {
     if (!isZoneUnlocked(this.state, zoneId) || zoneId === this.state.currentZone) return;
     this.state.currentZone = zoneId;
-    this.addLog(`Travelled to ${zoneById(zoneId).name}.`, 'info');
+    if (this.state.activity === 'fighting') {
+      this.leaveBattle();
+      this.addLog(`Travelled to ${zoneById(zoneId).name}.`, 'info');
+      this.newBattle();
+    }
+    this.save();
+  }
+
+  /** Sends the party into the selected zone. */
+  startFighting() {
+    if (this.state.activity === 'fighting') return;
+    if (isPartyWiped(this.state)) {
+      this.toast('Your party is too wounded to fight. Rest at the Inn first.');
+      return;
+    }
+    this.state.activity = 'fighting';
+    this.addLog(`Entered ${zoneById(this.state.currentZone).name}.`, 'info');
     this.newBattle();
+    this.save();
+    this.restartTimer(TURN_MS / 2);
+  }
+
+  /** Leaves combat, keeping current HP/MP. */
+  retreat() {
+    if (this.state.activity !== 'fighting') return;
+    this.leaveBattle();
+    this.state.activity = 'idle';
+    this.addLog('The party retreated.', 'info');
+    this.save();
+  }
+
+  /** Checks the party into the inn to recover over time. */
+  rest() {
+    if (this.state.activity === 'resting') return;
+    this.leaveBattle();
+    this.state.activity = 'resting';
+    this.addLog('The party checked into the Inn.', 'info');
+    this.save();
+    this.restartTimer(TURN_MS);
+  }
+
+  /** Leaves the inn without starting a fight. */
+  leaveInn() {
+    if (this.state.activity !== 'resting') return;
+    this.state.activity = 'idle';
     this.save();
   }
 
@@ -110,9 +165,10 @@ export class GameEngine {
   resetProgress() {
     this.storage?.removeItem(SAVE_KEY);
     this.state = newGame();
+    this.battle = null;
+    this.banner = null;
     this.log = [];
     this.toasts = [];
-    this.newBattle();
     this.save();
   }
 
@@ -131,11 +187,32 @@ export class GameEngine {
     this.timer = setTimeout(() => this.tick(), ms);
   }
 
+  private restartTimer(ms: number) {
+    this.stop();
+    this.schedule(ms);
+  }
+
   private tick() {
-    if (this.battle.outcome) {
+    const { activity } = this.state;
+    if (activity === 'fighting') this.schedule(this.fightTick());
+    else if (activity === 'resting') this.schedule(this.innTick());
+    else this.schedule(TURN_MS);
+  }
+
+  /** Advances combat by one action and returns the delay until the next tick. */
+  private fightTick(): number {
+    if (!this.battle || this.battle.outcome === 'victory') {
       this.newBattle();
-      this.schedule(TURN_MS / Math.max(1, this.battle.combatants.length));
-      return;
+      return TURN_MS / 2;
+    }
+    if (this.battle.outcome === 'defeat') {
+      // The wiped party is carried to the inn.
+      this.battle = null;
+      this.banner = null;
+      this.state.activity = 'resting';
+      this.toast('Your party was carried to the Inn to recover.');
+      this.save();
+      return TURN_MS;
     }
 
     const events = stepAction(this.battle, this.state, this.rng);
@@ -144,16 +221,28 @@ export class GameEngine {
     this.describe(events);
     for (const fn of this.eventListeners) fn(events);
 
-    if (this.battle.outcome === 'victory') this.onVictory();
-    else if (this.battle.outcome === 'defeat') this.onDefeat();
-
-    const delay = this.battle.outcome
-      ? this.battle.outcome === 'victory'
-        ? AFTER_VICTORY_MS
-        : AFTER_DEFEAT_MS
-      : TURN_MS / this.actionsThisTurn;
+    let delay = events.some((e) => e.type === 'regen') ? REGEN_STEP_MS : TURN_MS / this.actionsThisTurn;
+    if (this.battle.outcome === 'victory') {
+      this.onVictory();
+      delay = AFTER_VICTORY_MS;
+    } else if (this.battle.outcome === 'defeat') {
+      this.onDefeat();
+      delay = AFTER_DEFEAT_MS;
+    }
     this.emit();
-    this.schedule(delay);
+    return delay;
+  }
+
+  private innTick(): number {
+    if (!isPartyRested(this.state)) {
+      innTick(this.state);
+      if (isPartyRested(this.state)) {
+        this.addLog('The party is fully rested.', 'good');
+        this.toast('Your party is fully rested.');
+      }
+      this.save();
+    }
+    return TURN_MS;
   }
 
   private newBattle() {
@@ -163,9 +252,18 @@ export class GameEngine {
     this.emit();
   }
 
+  /** Ends the current fight early, keeping the damage taken so far. */
+  private leaveBattle() {
+    if (this.battle && !this.battle.outcome) saveBattleVitals(this.state, this.battle);
+    this.battle = null;
+    this.banner = null;
+  }
+
   private onVictory() {
-    const zone = zoneById(this.battle.zoneId);
-    const result = applyVictory(this.state, this.battle);
+    const battle = this.battle!;
+    const zone = zoneById(battle.zoneId);
+    saveBattleVitals(this.state, battle);
+    const result = applyVictory(this.state, battle);
     this.banner = { text: `Victory! +${result.xp} XP  +${result.gold} G`, tone: 'good' };
     this.addLog(`Victory! Gained ${result.xp} XP and ${result.gold} gold.`, 'good');
 
@@ -194,20 +292,14 @@ export class GameEngine {
   }
 
   private onDefeat() {
+    saveBattleVitals(this.state, this.battle!);
     this.banner = { text: 'Party defeated...', tone: 'bad' };
-    this.addLog('The party was defeated.', 'bad');
-    const zone = zoneById(this.battle.zoneId);
-    const prev = ZONES.find((z) => z.areaId === zone.areaId && z.index === zone.index - 1);
-    if (prev) {
-      // Fall back so an idle party keeps earning instead of wiping forever.
-      this.state.currentZone = prev.id;
-      this.addLog(`Retreated to ${prev.name}.`, 'info');
-    }
+    this.addLog('The party was defeated and carried to the Inn.', 'bad');
     this.save();
   }
 
   private describe(events: BattleEvent[]) {
-    const name = (id: string) => this.battle.combatants.find((c) => c.id === id)?.name ?? '?';
+    const name = (id: string) => this.battle?.combatants.find((c) => c.id === id)?.name ?? '?';
     for (const e of events) {
       if (e.type === 'action') {
         const who = name(e.actorId);
@@ -224,7 +316,7 @@ export class GameEngine {
       } else if (e.type === 'defeated') {
         this.addLog(`${name(e.targetId)} is defeated!`, 'info');
       } else if (e.type === 'idle') {
-        this.addLog(`${name(e.actorId)} waits.`);
+        this.addLog(`${name(e.actorId)} has no gambit to follow and waits.`, 'bad');
       }
     }
   }
