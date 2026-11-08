@@ -2,19 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Gambit Idle</title>
     <meta name="robots" content="noindex, nofollow" />
     <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="icon-192.png" />
     <meta name="theme-color" content="#10101a" />
-    <style>
-      html, body { margin: 0; height: 100%; background: #10101a; overflow: hidden; }
-      #game { width: 100%; height: 100%; }
-      canvas { image-rendering: pixelated; }
-    </style>
   </head>
   <body>
-    <div id="game"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
