@@ -1,5 +1,4 @@
-import '@fontsource/pixelify-sans/400.css';
-import '@fontsource/pixelify-sans/600.css';
+import '@fontsource/jersey-10/400.css';
 import { render } from 'preact';
 import { GameEngine } from './game/engine';
 import { App } from './ui/App';

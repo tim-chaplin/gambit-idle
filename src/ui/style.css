@@ -13,7 +13,10 @@
   --bad: #ff7a7a;
   --accent: #6c5ce7;
   --nav-w: 84px;
-  font-family: 'Pixelify Sans', system-ui, sans-serif;
+  font-family: 'Jersey 10', system-ui, sans-serif;
+  /* Single-weight pixel font: never fake bold. */
+  font-synthesis: none;
+  font-size: 20px;
   color: var(--text);
   background: var(--bg);
   -webkit-tap-highlight-color: transparent;
@@ -64,7 +67,7 @@ button, select { font: inherit; color: inherit; }
   background: var(--panel-2);
   border: 2px solid var(--border);
   padding: 12px 4px;
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1.1;
   cursor: pointer;
   box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.35);
@@ -73,11 +76,11 @@ button, select { font: inherit; color: inherit; }
   background: var(--accent);
   border-color: #a29bfe;
 }
-.build { margin-top: auto; font-size: 10px; color: var(--muted); text-align: center; word-break: break-all; }
+.build { margin-top: auto; font-size: 13px; color: var(--muted); text-align: center; word-break: break-all; }
 
 .main { overflow-y: auto; min-width: 0; }
 .screen { padding: 10px 10px 24px; display: flex; flex-direction: column; gap: 10px; }
-.screen-title { margin: 0; font-size: 20px; color: var(--gold); font-weight: 600; }
+.screen-title { margin: 0; font-size: 26px; color: var(--gold); font-weight: 600; }
 
 .panel {
   background: var(--panel);
@@ -88,18 +91,18 @@ button, select { font: inherit; color: inherit; }
   display: flex;
   justify-content: space-between;
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--muted);
 }
-.hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+.hint { font-size: 16px; color: var(--muted); margin: 6px 0 0; }
 
 /* Bars */
 .bar {
   position: relative;
-  height: 12px;
+  height: 15px;
   background: #0b0b14;
   border: 1px solid #000;
   margin-top: 3px;
@@ -111,8 +114,8 @@ button, select { font: inherit; color: inherit; }
 .bar-label {
   position: absolute;
   inset: 0;
-  font-size: 10px;
-  line-height: 11px;
+  font-size: 13px;
+  line-height: 14px;
   text-align: center;
   text-shadow: 1px 1px 0 #000;
 }
@@ -131,14 +134,14 @@ button, select { font: inherit; color: inherit; }
 .stage-top {
   display: flex;
   justify-content: space-between;
-  font-size: 12px;
+  font-size: 16px;
   text-shadow: 1px 1px 0 #000;
 }
 .row { display: flex; justify-content: center; align-items: flex-end; gap: 6px; }
 .unit { width: 84px; display: flex; flex-direction: column; align-items: center; transition: opacity 0.4s; }
 .unit-sprite { position: relative; }
 .unit-name {
-  font-size: 11px;
+  font-size: 14px;
   text-align: center;
   white-space: nowrap;
   overflow: hidden;
@@ -156,7 +159,7 @@ button, select { font: inherit; color: inherit; }
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 10px;
+  font-size: 13px;
   background: #000a;
   color: var(--gold);
   padding: 0 3px;
@@ -166,7 +169,7 @@ button, select { font: inherit; color: inherit; }
   left: 50%;
   top: 20%;
   transform: translateX(-50%);
-  font-size: 18px;
+  font-size: 23px;
   font-weight: 600;
   pointer-events: none;
   text-shadow: 2px 2px 0 #000;
@@ -174,7 +177,7 @@ button, select { font: inherit; color: inherit; }
 }
 .float-dmg { color: #fff; }
 .float-heal { color: var(--good); }
-.float-info { color: var(--gold); font-size: 13px; }
+.float-info { color: var(--gold); font-size: 17px; }
 .banner {
   position: absolute;
   left: 8px;
@@ -183,7 +186,7 @@ button, select { font: inherit; color: inherit; }
   transform: translateY(-50%);
   text-align: center;
   padding: 8px;
-  font-size: 16px;
+  font-size: 21px;
   font-weight: 600;
   background: #000c;
   border: 2px solid currentColor;
@@ -204,7 +207,7 @@ button, select { font: inherit; color: inherit; }
 @keyframes lunge-down { 50% { transform: translateY(10px); } }
 
 /* Log */
-.log { list-style: none; margin: 0; padding: 0; font-size: 12px; display: flex; flex-direction: column; gap: 3px; min-height: 96px; }
+.log { list-style: none; margin: 0; padding: 0; font-size: 16px; display: flex; flex-direction: column; gap: 3px; min-height: 96px; }
 .log li:not(:first-child) { opacity: 0.75; }
 .log-good { color: var(--good); }
 .log-bad { color: var(--bad); }
@@ -225,7 +228,7 @@ button, select { font: inherit; color: inherit; }
 .zone.current { border-color: var(--gold); }
 .zone.boss .zone-progress { color: var(--bad); }
 .zone:disabled { opacity: 0.45; cursor: default; }
-.zone-progress { font-size: 12px; color: var(--muted); }
+.zone-progress { font-size: 16px; color: var(--muted); }
 
 /* Buttons and inputs */
 .btn {
@@ -251,7 +254,7 @@ select {
   border: 2px solid var(--border);
   width: 34px;
   height: 30px;
-  font-size: 12px;
+  font-size: 16px;
   cursor: pointer;
 }
 .icon-btn:disabled { opacity: 0.35; }
@@ -259,18 +262,18 @@ select {
 /* Party */
 .hero-head { display: flex; gap: 10px; align-items: center; }
 .hero-meta { flex: 1; min-width: 0; }
-.hero-name { font-size: 18px; font-weight: 600; }
+.hero-name { font-size: 23px; font-weight: 600; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
-.stats div { background: var(--panel-2); padding: 6px 4px; text-align: center; font-size: 16px; }
-.stats span { display: block; font-size: 10px; color: var(--muted); }
+.stats div { background: var(--panel-2); padding: 6px 4px; text-align: center; font-size: 21px; }
+.stats span { display: block; font-size: 13px; color: var(--muted); }
 .equip-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
 .equip-row select { flex: 1; min-width: 0; }
 .equip-stack { display: flex; flex-direction: column; gap: 4px; padding: 4px 0; }
-.equip-label { color: var(--muted); font-size: 13px; }
-.skills { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.equip-label { color: var(--muted); font-size: 17px; }
+.skills { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; font-size: 17px; }
 .skills .locked { opacity: 0.5; }
-.skill-name { display: flex; justify-content: space-between; font-size: 15px; }
-.badge { font-size: 11px; background: var(--panel-2); padding: 1px 6px; color: var(--gold); }
+.skill-name { display: flex; justify-content: space-between; font-size: 20px; }
+.badge { font-size: 14px; background: var(--panel-2); padding: 1px 6px; color: var(--gold); }
 
 .gambits { display: flex; flex-direction: column; gap: 8px; }
 .gambits .hint { margin: 0 0 2px; }
@@ -278,21 +281,21 @@ select {
 .gambit.off { opacity: 0.5; }
 .gambit.invalid { border-color: var(--bad); }
 .gambit-main { display: flex; align-items: center; gap: 4px; }
-.gambit-main select { flex: 1; font-size: 13px; }
+.gambit-main select { flex: 1; font-size: 17px; }
 .gambit-tools { display: flex; gap: 4px; }
 .arrow { width: 26px; text-align: center; }
-.gambit-warn { color: var(--bad); font-size: 11px; }
+.gambit-warn { color: var(--bad); font-size: 14px; }
 .arrow { color: var(--gold); }
-.toggle { display: flex; align-items: center; gap: 2px; font-size: 12px; color: var(--muted); }
+.toggle { display: flex; align-items: center; gap: 2px; font-size: 16px; color: var(--muted); }
 .toggle input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
 
 /* Town */
 .shop { display: flex; flex-direction: column; gap: 6px; }
 .shop-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--panel-2); padding: 8px; }
 .shop-info { min-width: 0; }
-.shop-name { font-size: 15px; }
-.shop-desc { font-size: 12px; color: var(--muted); }
-.shop-owned { font-size: 11px; color: var(--good); }
+.shop-name { font-size: 20px; }
+.shop-desc { font-size: 16px; color: var(--muted); }
+.shop-owned { font-size: 14px; color: var(--good); }
 .shop-actions { display: flex; flex-direction: column; gap: 4px; }
 
 /* Toasts */
@@ -312,7 +315,7 @@ select {
   border: 2px solid var(--gold);
   padding: 10px;
   text-align: left;
-  font-size: 13px;
+  font-size: 17px;
   animation: toast-in 0.25s ease-out;
 }
 @keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
