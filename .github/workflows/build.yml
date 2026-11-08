@@ -1,0 +1,69 @@
+name: Build & publish
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 0.1.${{ github.run_number }}
+      BUILD_ID: ${{ github.run_number }} (${{ github.sha }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Build web assets
+        run: |
+          export BUILD_ID="${BUILD_ID:0:20}"
+          npm ci
+          npm run build
+          npx cap sync android
+
+      - name: Build signed APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: gambit-idle
+        run: |
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/release.jks"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$ANDROID_KEYSTORE_PATH"
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/gambit-idle.apk"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          MSG=$(git log -1 --pretty=%s)
+          gh release create "$TAG" gambit-idle.apk \
+            --title "Build ${{ github.run_number }}: $MSG" \
+            --notes "Commit ${{ github.sha }}" \
+            --latest
+          # Keep only the 10 most recent builds.
+          gh release list --limit 100 --json tagName --jq '.[].tagName' \
+            | grep '^build-' | tail -n +11 \
+            | xargs -r -I{} gh release delete {} --cleanup-tag --yes

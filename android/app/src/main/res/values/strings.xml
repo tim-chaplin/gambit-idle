@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Gambit Idle</string>
+    <string name="title_activity_main">Gambit Idle</string>
+    <string name="package_name">com.timchaplin.gambitidle</string>
+    <string name="custom_url_scheme">com.timchaplin.gambitidle</string>
+</resources>
