@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 concurrency:
   group: build
@@ -67,3 +69,29 @@ jobs:
           gh release list --limit 100 --json tagName --jq '.[].tagName' \
             | grep '^build-' | tail -n +11 \
             | xargs -r -I{} gh release delete {} --cleanup-tag --yes
+
+  # Playable web build on GitHub Pages. Off until Pages is enabled and the
+  # repo variable PAGES_ENABLED is set to "true".
+  web:
+    if: vars.PAGES_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Build
+        env:
+          BUILD_ID: ${{ github.run_number }}
+        run: |
+          npm ci
+          npm run build
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -14,5 +14,5 @@ npm run android:sync   # build web assets and copy them into android/
 
 ## Testing on a phone
 
-Every push to `main` builds a signed APK and publishes it as a GitHub Release.
+Every push to `main` deploys a playable web build to GitHub Pages (once enabled) and builds a signed APK, published as a GitHub Release.
 Download the latest from **[Releases → latest](../../releases/latest)** and install it. Each build upgrades the previous one in place.
