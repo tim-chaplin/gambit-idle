@@ -50,6 +50,7 @@ export class GameEngine {
 
   private listeners = new Set<() => void>();
   private eventListeners = new Set<(events: BattleEvent[]) => void>();
+  private navigateListeners = new Set<(screen: 'town') => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private actionsThisTurn = 1;
   private nextId = 1;
@@ -75,6 +76,12 @@ export class GameEngine {
   onBattleEvents(fn: (events: BattleEvent[]) => void) {
     this.eventListeners.add(fn);
     return () => void this.eventListeners.delete(fn);
+  }
+
+  /** Lets the UI follow the party when the game moves it, e.g. to the Inn after a wipe. */
+  onNavigate(fn: (screen: 'town') => void) {
+    this.navigateListeners.add(fn);
+    return () => void this.navigateListeners.delete(fn);
   }
 
   start() {
@@ -212,6 +219,7 @@ export class GameEngine {
       this.state.activity = 'resting';
       this.toast('Your party was carried to the Inn to recover.');
       this.save();
+      for (const fn of this.navigateListeners) fn('town');
       return TURN_MS;
     }
 

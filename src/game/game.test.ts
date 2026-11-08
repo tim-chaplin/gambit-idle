@@ -149,7 +149,7 @@ describe('sustain', () => {
     state.heroes[0].mp = 0;
     expect(isPartyRested(state)).toBe(false);
     innTick(state);
-    expect(heroVitals(state.heroes[0]).hp).toBe(4); // 10% of 40
+    expect(heroVitals(state.heroes[0]).hp).toBe(2); // 10% of 20
     for (let i = 0; i < 12; i++) innTick(state);
     expect(isPartyRested(state)).toBe(true);
   });
@@ -162,7 +162,7 @@ describe('sustain', () => {
     hero.hp = 10;
     applyVictory(state, battle);
     expect(hero.level).toBe(2);
-    expect(heroVitals(hero).hp).toBe(18);
+    expect(heroVitals(hero).hp).toBe(20); // 10 + the 10 max HP gained
   });
 });
 

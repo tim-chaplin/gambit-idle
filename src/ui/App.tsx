@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { AREAS } from '../game/data/areas';
 import { AreaScreen } from './screens/AreaScreen';
 import { PartyScreen } from './screens/PartyScreen';
@@ -14,6 +14,7 @@ type Screen = { kind: 'party' } | { kind: 'town' } | { kind: 'area'; areaId: str
 export function App() {
   const engine = useEngine();
   const [screen, setScreen] = useState<Screen>({ kind: 'area', areaId: AREAS[0].id });
+  useEffect(() => engine.onNavigate((kind) => setScreen({ kind })), [engine]);
 
   const navItems: { label: string; screen: Screen; active: boolean }[] = [
     { label: 'Party', screen: { kind: 'party' }, active: screen.kind === 'party' },
